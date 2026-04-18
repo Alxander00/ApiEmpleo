@@ -2,6 +2,12 @@ import express, { json } from 'express';
 import dotenv from 'dotenv';
 import { pool } from './db.js';
 
+
+
+
+
+
+import postulacionesRoutes from './routes/postulaciones.js';
 import authRoutes from './routes/auth.js';
 import candidatosRoutes from './routes/candidato.js';
 dotenv.config();
@@ -11,6 +17,7 @@ app.use(express.json());
 
 app.use('/api', authRoutes);
 app.use('/api/candidatos', candidatosRoutes);
+app.use('/api/postulaciones', postulacionesRoutes);
 
 app.get('/', (req, res) => {
     res.send('Servidor funcionando.');
