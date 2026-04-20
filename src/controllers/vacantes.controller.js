@@ -66,9 +66,16 @@ export const crearVacante = async (req, res) => {
 // 🔹 Listar vacantes públicas
 export const obtenerVacantes = async (req, res) => {
     try {
-        const vacantes = await pool.query(
-            "SELECT * FROM vacantes WHERE estado = 'PUBLICADA'"
-        );
+        const vacantes = await pool.query(`
+            SELECT 
+                v.*, 
+                e.nombre_comercial AS empresa_nombre, 
+                e.url_logo AS empresa_logo 
+            FROM vacantes v
+            JOIN empresas e ON v.empresa_id = e.id
+            WHERE v.estado = 'PUBLICADA'
+            ORDER BY v.creado_el DESC
+        `);
 
         res.json(vacantes.rows);
 
@@ -163,5 +170,137 @@ export const cerrarVacante = async (req, res) => {
     } catch (error) {
         console.error('Error cerrarVacante:', error.message);
         res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+// PUT /api/vacantes/:id - Actualizar una vacante existente
+export const actualizarVacante = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        const { id } = req.params;
+        const { 
+            titulo_puesto, modalidad, descripcion_puesto, 
+            requisitos, rango_salarial_min, rango_salarial_max, 
+            ubicacion_especifica, beneficios 
+        } = req.body;
+
+        // 1. Validar que el usuario tenga un perfil de empresa
+        const empresa = await pool.query('SELECT id FROM empresas WHERE usuario_id = $1', [usuarioId]);
+        if (empresa.rows.length === 0) {
+            return res.status(403).json({ error: 'Perfil de empresa no encontrado' });
+        }
+        const empresaId = empresa.rows[0].id;
+
+        // 2. Actualizar la vacante en PostgreSQL
+        const resultado = await pool.query(
+            `UPDATE vacantes 
+             SET titulo_puesto = $1, modalidad = $2, descripcion_puesto = $3, 
+                 requisitos = $4, rango_salarial_min = $5, rango_salarial_max = $6, 
+                 ubicacion_especifica = $7, beneficios = $8
+             WHERE id = $9 AND empresa_id = $10
+             RETURNING *`,
+            [
+                titulo_puesto, modalidad, descripcion_puesto, requisitos, 
+                rango_salarial_min || null, rango_salarial_max || null, 
+                ubicacion_especifica, beneficios, id, empresaId
+            ]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: 'Vacante no encontrada o no tienes permisos para editarla' });
+        }
+
+        res.json({ mensaje: 'Vacante actualizada correctamente', vacante: resultado.rows[0] });
+    } catch (error) {
+        console.error('Error en actualizarVacante:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+// DELETE /api/vacantes/:id - Eliminar una vacante
+export const eliminarVacante = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        const { id } = req.params;
+
+        // 1. Validar que el usuario tenga un perfil de empresa
+        const empresa = await pool.query('SELECT id FROM empresas WHERE usuario_id = $1', [usuarioId]);
+        if (empresa.rows.length === 0) {
+            return res.status(403).json({ error: 'Perfil de empresa no encontrado' });
+        }
+        const empresaId = empresa.rows[0].id;
+
+        // 2. Eliminar la vacante (Solo si pertenece a esa empresa)
+        const resultado = await pool.query(
+            'DELETE FROM vacantes WHERE id = $1 AND empresa_id = $2 RETURNING id',
+            [id, empresaId]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: 'Vacante no encontrada o no tienes permisos' });
+        }
+
+        res.json({ mensaje: 'Vacante eliminada correctamente' });
+    } catch (error) {
+        console.error('Error en eliminarVacante:', error);
+        // Si hay postulaciones atadas a esta vacante, Postgres bloqueará el DELETE por llave foránea.
+        if (error.code === '23503') {
+            return res.status(400).json({ error: 'No puedes eliminar una vacante que ya tiene candidatos postulados.' });
+        }
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+// 🔹 Obtener solo las vacantes de la empresa autenticada
+export const obtenerMisVacantes = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        const rol = req.usuario.rol;
+
+        if (rol !== 'EMPRESA') {
+            return res.status(403).json({ error: 'Solo empresas pueden ver sus vacantes' });
+        }
+
+        const empresa = await pool.query(
+            'SELECT id FROM empresas WHERE usuario_id = $1',
+            [usuarioId]
+        );
+
+        if (empresa.rows.length === 0) {
+            return res.status(400).json({ error: 'No tienes una empresa registrada' });
+        }
+
+        const empresaId = empresa.rows[0].id;
+
+        const vacantes = await pool.query(
+            `SELECT * FROM vacantes 
+             WHERE empresa_id = $1 
+             ORDER BY creado_el DESC`,
+            [empresaId]
+        );
+
+        res.json(vacantes.rows);
+
+    } catch (error) {
+        console.error('Error obtenerMisVacantes:', error.message);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+// admin.controller.js o vacantes.controller.js
+export const obtenerDetalleVacanteFull = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT v.*, e.razon_social, e.nombre_comercial, e.sitio_web, e.descripcion_empresa, e.url_logo, e.ubicacion_sede
+            FROM vacantes v
+            JOIN empresas e ON v.empresa_id = e.id
+            WHERE v.id = $1
+        `, [id]);
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Vacante no encontrada' });
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error de servidor' });
     }
 };

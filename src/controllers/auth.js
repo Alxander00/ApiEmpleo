@@ -2,41 +2,46 @@ import { pool } from '../db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+// auth.js (Controlador de Kevin corregido)
 export const registrarUsuario = async (req, res) => {
+    const client = await pool.connect(); // Usamos cliente para transacciones
     try {
-        const { correo_electronico, password, rol } = req.body;
+        const { correo_electronico, password, rol, nombre } = req.body;
 
-        if (!correo_electronico || !password || !rol) {
-            return res.status(400).json({ error: 'Todos los campos son obligatorios' });
-        }
+        await client.query('BEGIN'); // Iniciamos transacción
 
-        const usuarioExistente = await pool.query(
-            'SELECT * FROM usuarios WHERE correo_electronico = $1',
-            [correo_electronico]
-        );
-
-        if (usuarioExistente.rows.length > 0) {
-            return res.status(400).json({ error: 'El correo ya está registrado' });
-        }
-
+        // 1. Crear el usuario
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
-
-        const nuevoUsuario = await pool.query(
+        const userRes = await client.query(
             `INSERT INTO usuarios (correo_electronico, password_hash, rol, estado) 
-             VALUES ($1, $2, $3, 'ACTIVO') 
-             RETURNING id, correo_electronico, rol, estado, creado_el`,
+             VALUES ($1, $2, $3, 'ACTIVO') RETURNING id`,
             [correo_electronico, password_hash, rol]
         );
+        const userId = userRes.rows[0].id;
 
-        res.status(201).json({
-            mensaje: 'Usuario creado exitosamente',
-            usuario: nuevoUsuario.rows[0]
-        });
+        // 2. Crear el perfil automáticamente según el rol
+        if (rol === 'CANDIDATO') {
+            await client.query(
+                'INSERT INTO candidatos (usuario_id, nombres, apellidos) VALUES ($1, $2, $3)',
+                [userId, nombre, ''] // 'nombre' viene del formulario de registro
+            );
+        } else if (rol === 'EMPRESA') {
+            await client.query(
+                'INSERT INTO empresas (usuario_id, razon_social) VALUES ($1, $2)',
+                [userId, nombre]
+            );
+        }
+
+        await client.query('COMMIT'); // Guardamos todo
+        res.status(201).json({ mensaje: 'Usuario y perfil creados exitosamente' });
 
     } catch (error) {
-        console.error('Error en registrarUsuario:', error.message);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        await client.query('ROLLBACK'); // Si algo falla, deshacemos todo
+        console.error('Error en registro:', error.message);
+        res.status(500).json({ error: 'Error al registrar usuario' });
+    } finally {
+        client.release();
     }
 };
 

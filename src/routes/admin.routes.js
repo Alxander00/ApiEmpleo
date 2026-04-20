@@ -2,17 +2,21 @@ import { Router } from 'express';
 import { 
     obtenerUsuarios, 
     suspenderUsuario, 
-    verificarEmpresa 
+    verificarEmpresa,
+    obtenerMetricasDashboard,
+    obtenerTodasVacantes,
+    eliminarVacante,
+    obtenerPostsForo,
+    activarUsuario,
+    crearRecurso
 } from '../controllers/admin.controller.js';
 
 import { verificarToken } from '../middlewares/auth.js';
 
-// 🔥 DEBUG: confirmar que el archivo se está cargando
 console.log("🔥 ADMIN ROUTES ACTIVAS 🔥");
 
 const router = Router();
 
-// 🔥 Ruta de prueba (sin token)
 router.get('/test', (req, res) => {
     res.json({ mensaje: "Ruta admin funcionando 🔥" });
 });
@@ -21,5 +25,14 @@ router.get('/test', (req, res) => {
 router.get('/usuarios', verificarToken, obtenerUsuarios);
 router.patch('/usuarios/:id/suspender', verificarToken, suspenderUsuario);
 router.patch('/empresas/:id/verificar', verificarToken, verificarEmpresa);
+
+// <-- 2. AÑADIR LA RUTA DE MÉTRICAS AQUÍ
+router.get('/metrics', verificarToken, obtenerMetricasDashboard);
+
+router.get('/vacantes', verificarToken, obtenerTodasVacantes);
+router.delete('/vacantes/:id', verificarToken, eliminarVacante);
+router.get('/foro', verificarToken, obtenerPostsForo);
+router.patch('/usuarios/:id/activar', verificarToken, activarUsuario);
+router.post('/recursos', verificarToken, crearRecurso);
 
 export default router;

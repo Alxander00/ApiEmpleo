@@ -149,3 +149,76 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
+
+// PATCH /api/postulaciones/:id - Actualizar la etapa de la postulación
+export const actualizarEstadoPostulacion = async (req, res) => {
+    try {
+        const usuarioRol = req.usuario.rol;
+        const { id } = req.params; // Este es el ID de la postulación
+        const { etapa_actual } = req.body;
+
+        // 1. Validar permisos
+        if (usuarioRol !== 'EMPRESA') {
+            return res.status(403).json({ error: 'Solo empresas pueden cambiar estados' });
+        }
+
+        // 2. Validar que envíen el estado
+        if (!etapa_actual) {
+            return res.status(400).json({ error: 'La etapa_actual es obligatoria' });
+        }
+
+        // 3. Actualizar en PostgreSQL
+        const resultado = await pool.query(
+            `UPDATE postulaciones 
+             SET etapa_actual = $1 
+             WHERE id = $2 
+             RETURNING id, etapa_actual`,
+            [etapa_actual, id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: 'Postulación no encontrada' });
+        }
+
+        res.json({ 
+            mensaje: 'Estado actualizado correctamente', 
+            postulacion: resultado.rows[0] 
+        });
+
+    } catch (error) {
+        console.error('Error en actualizarEstadoPostulacion:', error.message);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
+// GET /api/postulaciones/mis-postulaciones - Candidato ve su historial
+export const obtenerMisPostulaciones = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        if (req.usuario.rol !== 'CANDIDATO') return res.status(403).json({ error: 'Solo candidatos' });
+
+        // Buscamos el ID del candidato
+        const candidato = await pool.query('SELECT id FROM candidatos WHERE usuario_id = $1', [usuarioId]);
+        if (candidato.rows.length === 0) return res.status(404).json({ error: 'Perfil no encontrado' });
+
+        const candidatoId = candidato.rows[0].id;
+
+        // Traemos las postulaciones con el nombre de la vacante y la empresa
+        const postulaciones = await pool.query(
+            `SELECT p.id, p.etapa_actual, p.fecha_postulacion, 
+                    v.titulo_puesto, v.modalidad, v.ubicacion_especifica,
+                    e.nombre_comercial AS empresa
+             FROM postulaciones p
+             INNER JOIN vacantes v ON p.vacante_id = v.id
+             INNER JOIN empresas e ON v.empresa_id = e.id
+             WHERE p.candidato_id = $1
+             ORDER BY p.fecha_postulacion DESC`,
+            [candidatoId]
+        );
+
+        res.json(postulaciones.rows);
+    } catch (error) {
+        console.error("Error al obtener mis postulaciones:", error);
+        res.status(500).json({ error: "Error del servidor" });
+    }
+};

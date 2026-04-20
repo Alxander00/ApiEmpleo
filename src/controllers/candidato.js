@@ -1,66 +1,97 @@
-// src/controllers/candidatos.controller.js
 import { pool } from '../db.js';
 
-// 1. Crear o actualizar el perfil del candidato
 export const crearPerfilCandidato = async (req, res) => {
     try {
         const usuarioId = req.usuario.id; 
-        const { nombres, apellidos, telefono_contacto, titular_profesional, resumen_biografico, habilidades_tecnicas } = req.body;
+        const { 
+            nombres, apellidos, telefono_contacto, fecha_nacimiento, 
+            titular_profesional, resumen_biografico, url_curriculum_pdf, 
+            foto_perfil_url, habilidades_tecnicas 
+        } = req.body;
 
         if (!nombres || !apellidos) {
             return res.status(400).json({ error: 'Nombres y apellidos son obligatorios' });
         }
 
+        // Convertimos el string de habilidades en un array para PostgreSQL
+        const habilidadesArr = Array.isArray(habilidades_tecnicas) 
+            ? habilidades_tecnicas 
+            : (habilidades_tecnicas ? habilidades_tecnicas.split(',').map(s => s.trim()) : []);
+
         const perfilExistente = await pool.query('SELECT id FROM candidatos WHERE usuario_id = $1', [usuarioId]);
 
         let resultado;
-
         if (perfilExistente.rows.length > 0) {
-            // ACTUALIZAR (UPDATE)
+            // Lógica de ACTUALIZACIÓN
             resultado = await pool.query(
                 `UPDATE candidatos 
-                 SET nombres = $1, apellidos = $2, telefono_contacto = $3, titular_profesional = $4, resumen_biografico = $5, habilidades_tecnicas = $6, actualizado_el = CURRENT_TIMESTAMP
-                 WHERE usuario_id = $7 RETURNING *`,
-                [nombres, apellidos, telefono_contacto, titular_profesional, resumen_biografico, habilidades_tecnicas, usuarioId]
+                 SET nombres = $1, apellidos = $2, telefono_contacto = $3, fecha_nacimiento = $4, 
+                     titular_profesional = $5, resumen_biografico = $6, url_curriculum_pdf = $7, 
+                     foto_perfil_url = $8, habilidades_tecnicas = $9, actualizado_el = CURRENT_TIMESTAMP
+                 WHERE usuario_id = $10 RETURNING *`,
+                [nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr, usuarioId]
             );
         } else {
-            // CREAR NUEVO (INSERT)
+            // Lógica de CREACIÓN
             resultado = await pool.query(
-                `INSERT INTO candidatos (usuario_id, nombres, apellidos, telefono_contacto, titular_profesional, resumen_biografico, habilidades_tecnicas) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-                [usuarioId, nombres, apellidos, telefono_contacto, titular_profesional, resumen_biografico, habilidades_tecnicas]
+                `INSERT INTO candidatos (usuario_id, nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidades_tecnicas) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+                [usuarioId, nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr]
             );
         }
 
-        res.status(200).json({
-            mensaje: 'Perfil guardado exitosamente',
-            perfil: resultado.rows[0]
-        });
-
+        res.status(200).json({ mensaje: 'Perfil actualizado con éxito', perfil: resultado.rows[0] });
     } catch (error) {
         console.error('Error en crearPerfilCandidato:', error.message);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
-// 2. Obtener mi propio perfil
 export const obtenerMiPerfil = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
+        const resultado = await pool.query('SELECT * FROM candidatos WHERE usuario_id = $1', [usuarioId]);
+        
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: 'Perfil no encontrado' });
+        }
+        res.json(resultado.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener los datos del perfil' });
+    }
+};
+
+// Añadir esta función en controllers/candidato.js
+
+export const registrarVistaPerfil = async (req, res) => {
+    try {
+        const { id } = req.params; // Este es el ID del candidato que están viendo
+        const rol = req.usuario.rol; // Lo sacamos del token
+
+        // Seguridad: Solo las EMPRESAS suman vistas reales
+        if (rol !== 'EMPRESA') {
+            return res.status(403).json({ error: 'Solo las empresas pueden generar vistas al perfil' });
+        }
 
         const resultado = await pool.query(
-            'SELECT * FROM candidatos WHERE usuario_id = $1',
-            [usuarioId]
+            `UPDATE candidatos 
+             SET vistas_perfil = vistas_perfil + 1 
+             WHERE id = $1 
+             RETURNING vistas_perfil`,
+            [id]
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({ error: 'Aún no has creado tu perfil de candidato' });
+            return res.status(404).json({ error: 'Candidato no encontrado' });
         }
 
-        res.json(resultado.rows[0]);
+        res.status(200).json({ 
+            mensaje: 'Vista registrada exitosamente', 
+            vistasTotales: resultado.rows[0].vistas_perfil 
+        });
 
     } catch (error) {
-        console.error('Error en obtenerMiPerfil:', error.message);
+        console.error('Error en registrarVistaPerfil:', error.message);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };

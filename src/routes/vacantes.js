@@ -3,7 +3,9 @@ import {
     crearVacante, 
     obtenerVacantes, 
     editarVacante, 
-    cerrarVacante 
+    cerrarVacante,
+    obtenerMisVacantes ,
+    obtenerDetalleVacanteFull
 } from '../controllers/vacantes.controller.js';
 
 import { verificarToken } from '../middlewares/auth.js';
@@ -17,5 +19,7 @@ router.get('/', obtenerVacantes);
 router.post('/', verificarToken, crearVacante);
 router.put('/:id', verificarToken, editarVacante);
 router.patch('/:id/cerrar', verificarToken, cerrarVacante);
+router.get('/mis-vacantes', verificarToken, obtenerMisVacantes);
+router.get('/:id', verificarToken, obtenerDetalleVacanteFull);
 
 export default router;
