@@ -28,10 +28,14 @@ export const suspenderUsuario = async (req, res) => {
 
         const { id } = req.params;
 
-        await pool.query(
-            "UPDATE usuarios SET estado = 'SUSPENDIDO' WHERE id = $1",
+        const resultado = await pool.query(
+            "UPDATE usuarios SET estado = 'SUSPENDIDO' WHERE id = $1 RETURNING *",
             [id]
         );
+
+        if (resultado.rowCount === 0) {
+             return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
 
         res.json({ mensaje: 'Usuario suspendido correctamente' });
 

@@ -16,7 +16,7 @@ app.use(express.json());
 app.use('/api', authRoutes);
 app.use('/api/candidatos', candidatosRoutes);
 app.use('/api/vacantes', vacantesRoutes);
-app.use('/api/admin', adminRoutes); // 👈 AQUÍ VA
+app.use('/api/admin', adminRoutes);
 
 // Ruta base
 app.get('/', (req, res) => {
