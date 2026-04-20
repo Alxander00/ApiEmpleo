@@ -7,6 +7,9 @@ import { pool } from './db.js';
 import authRoutes from './routes/auth.js';
 import candidatosRoutes from './routes/candidato.js';
 import vacantesRoutes from './routes/vacantes.js';
+import empresasRoutes from './routes/empresas.routes.js';
+import postulacionesRoutes from './routes/postulaciones.js';
+
 
 const app = express();
 app.use(express.json());
@@ -15,6 +18,9 @@ app.use(express.json());
 app.use('/api', authRoutes);
 app.use('/api/candidatos', candidatosRoutes);
 app.use('/api/vacantes', vacantesRoutes);
+app.use('/api/empresas', empresasRoutes);
+app.use('/api/postulaciones', postulacionesRoutes);
+
 
 // Ruta base
 app.get('/', (req, res) => {

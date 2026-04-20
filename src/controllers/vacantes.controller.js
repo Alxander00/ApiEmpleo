@@ -21,7 +21,6 @@ export const crearVacante = async (req, res) => {
 
         const empresaId = empresa.rows[0].id;
 
-        // 1. Extraemos los datos del frontend
         const {
             titulo_puesto,
             descripcion_puesto,
@@ -34,10 +33,6 @@ export const crearVacante = async (req, res) => {
             categoria_id,
             fecha_vencimiento
         } = req.body;
-
-        if (!titulo_puesto || !descripcion_puesto || !requisitos || !categoria_id) {
-            return res.status(400).json({ error: 'Faltan campos obligatorios' });
-        }
 
         const nuevaVacante = await pool.query(
             `INSERT INTO vacantes 
@@ -72,11 +67,7 @@ export const crearVacante = async (req, res) => {
 export const obtenerVacantes = async (req, res) => {
     try {
         const vacantes = await pool.query(
-            `SELECT v.*, e.nombre_comercial, e.url_logo 
-             FROM vacantes v
-             INNER JOIN empresas e ON v.empresa_id = e.id
-             WHERE v.estado = 'PUBLICADA'
-             ORDER BY v.creado_el DESC`
+            "SELECT * FROM vacantes WHERE estado = 'PUBLICADA'"
         );
 
         res.json(vacantes.rows);
