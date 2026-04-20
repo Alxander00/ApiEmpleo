@@ -10,6 +10,7 @@ import empresasRoutes from './routes/empresas.routes.js';
 import postulacionesRoutes from './routes/postulaciones.js';
 import forosRoutes from './routes/foros.routes.js';
 import recursosRoutes from './routes/recursos.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 
 
 const app = express();
