@@ -1,0 +1,122 @@
+import { pool } from '../db.js';
+
+// Listar todos los foros
+export const listarForos = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM foros ORDER BY creado_el DESC');
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Error en listarForos:', error);
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
+    }
+};
+
+// Obtener un foro por id
+export const obtenerForoPorId = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            'SELECT * FROM foros WHERE id = $1',
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: 'Foro no encontrado'
+            });
+        }
+
+        res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error('Error en obtenerForoPorId:', error);
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
+    }
+};
+
+// Crear un nuevo foro
+export const crearForo = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        const { titulo, contenido, categoria_id } = req.body;
+
+        if (!titulo || !contenido) {
+            return res.status(400).json({
+                error: 'Titulo y contenido son obligatorios'
+            });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO foros (usuario_id, categoria_id, titulo, contenido)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [usuarioId, categoria_id || null, titulo, contenido]
+        );
+
+        res.status(201).json({
+            mensaje: 'Foro creado correctamente',
+            foro: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error en crearForo:', error);
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
+    }
+};
+
+// Listar respuestas de un foro
+export const listarRespuestasForo = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            'SELECT * FROM respuestas_foro WHERE foro_id = $1 ORDER BY creado_el ASC',
+            [id]
+        );
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Error en listarRespuestasForo:', error);
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
+    }
+};
+
+// Crear respuesta en un foro
+export const crearRespuestaForo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const usuarioId = req.usuario.id;
+        const { contenido } = req.body;
+
+        if (!contenido) {
+            return res.status(400).json({
+                error: 'El contenido es obligatorio'
+            });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO respuestas_foro (foro_id, usuario_id, contenido)
+             VALUES ($1, $2, $3)
+             RETURNING *`,
+            [id, usuarioId, contenido]
+        );
+
+        res.status(201).json({
+            mensaje: 'Respuesta creada correctamente',
+            respuesta: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error en crearRespuestaForo:', error);
+        res.status(500).json({
+            error: 'Error interno del servidor'
+        });
+    }
+};

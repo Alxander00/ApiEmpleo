@@ -9,6 +9,8 @@ import candidatosRoutes from './routes/candidato.js';
 import vacantesRoutes from './routes/vacantes.js';
 import empresasRoutes from './routes/empresas.routes.js';
 import postulacionesRoutes from './routes/postulaciones.js';
+import forosRoutes from './routes/foros.routes.js';
+import recursosRoutes from './routes/recursos.routes.js';
 
 
 const app = express();
@@ -20,6 +22,8 @@ app.use('/api/candidatos', candidatosRoutes);
 app.use('/api/vacantes', vacantesRoutes);
 app.use('/api/empresas', empresasRoutes);
 app.use('/api/postulaciones', postulacionesRoutes);
+app.use('/api/foros', forosRoutes);
+app.use('/api/recursos', recursosRoutes);
 
 
 // Ruta base
