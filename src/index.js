@@ -22,6 +22,7 @@ app.use('/api/empresas', empresasRoutes);
 app.use('/api/postulaciones', postulacionesRoutes);
 app.use('/api/foros', forosRoutes);
 app.use('/api/recursos', recursosRoutes);
+app.use('/api/admin', adminRoutes);
 
 
 // Ruta base
