@@ -42,10 +42,10 @@ export const registrarUsuario = async (req, res) => {
 
 export const loginUsuario = async (req, res) => {
     try {
-        const { correo_electronico , password } = req.body;
+        const { correo_electronico, password } = req.body;
 
         if (!correo_electronico || !password) {
-            return res.status(400).json({error: 'Correo y contraseña son obligatorios'});
+            return res.status(400).json({ error: 'Correo y contraseña son obligatorios' });
         }
 
         const resultado = await pool.query(
@@ -53,22 +53,27 @@ export const loginUsuario = async (req, res) => {
             [correo_electronico]
         );
 
-        if (resultado.rows.length === 0){
-            return res.status(401).json({error: 'Credenciales inválidas'});
+        if (resultado.rows.length === 0) {
+            return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
         const usuario = resultado.rows[0];
 
+        // 🔥 Validación extra (evita errores raros)
+        if (!usuario.password_hash) {
+            return res.status(500).json({ error: 'Usuario sin contraseña válida' });
+        }
+
         const passwordValida = await bcrypt.compare(password, usuario.password_hash);
 
         if (!passwordValida) {
-            return res.status(401).json({error: 'Credenciales inválidas'});
+            return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
         const token = jwt.sign(
-            {id: usuario.id, rol: usuario.rol},
+            { id: usuario.id, rol: usuario.rol },
             process.env.JWT_SECRET,
-            {expiresIn: '24h'}
+            { expiresIn: '24h' }
         );
 
         res.json({
@@ -80,9 +85,11 @@ export const loginUsuario = async (req, res) => {
                 rol: usuario.rol
             }
         });
+
     } catch (error) {
-        console.log('Error en loginUsuario:', error.mensage);
-        res.status(500).json({error: 'Error interno del servidor'});
+        // ✅ CORREGIDO AQUÍ
+        console.error('Error en loginUsuario:', error.message);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -100,6 +107,7 @@ export const obtenerPerfilActual = async (req, res) => {
         }
 
         res.json(resultado.rows[0]);
+
     } catch (error) {
         console.error('Error en obtenerPerfilActual:', error.message);
         res.status(500).json({ error: 'Error interno del servidor' });
