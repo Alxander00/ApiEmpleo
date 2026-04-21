@@ -17,6 +17,8 @@ export const crearPerfilCandidato = async (req, res) => {
             ? habilidades_tecnicas 
             : (habilidades_tecnicas ? habilidades_tecnicas.split(',').map(s => s.trim()) : []);
 
+        const fechaNacSQL = (fecha_nacimiento === "" || fecha_nacimiento === undefined) ? null : fecha_nacimiento;
+
         const perfilExistente = await pool.query('SELECT id FROM candidatos WHERE usuario_id = $1', [usuarioId]);
 
         let resultado;
@@ -28,28 +30,34 @@ export const crearPerfilCandidato = async (req, res) => {
                      titular_profesional = $5, resumen_biografico = $6, url_curriculum_pdf = $7, 
                      foto_perfil_url = $8, habilidades_tecnicas = $9, actualizado_el = CURRENT_TIMESTAMP
                  WHERE usuario_id = $10 RETURNING *`,
-                [nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr, usuarioId]
+                [nombres, apellidos, telefono_contacto, fechaNacSQL, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr, usuarioId]
             );
         } else {
             // CREACIÓN
             resultado = await pool.query(
                 `INSERT INTO candidatos (usuario_id, nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidades_tecnicas) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-                [usuarioId, nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr]
+                [usuarioId, nombres, apellidos, telefono_contacto, fechaNacSQL, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr]
             );
         }
 
         res.status(200).json({ mensaje: 'Perfil actualizado con éxito', perfil: resultado.rows[0] });
     } catch (error) {
         console.error('Error en crearPerfilCandidato:', error.message);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: 'Error interno del servidor', detalle: error.message });
     }
 };
 
 export const obtenerMiPerfil = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
-        const resultado = await pool.query('SELECT * FROM candidatos WHERE usuario_id = $1', [usuarioId]);
+        
+        const resultado = await pool.query(`
+            SELECT c.*, u.correo_electronico 
+            FROM candidatos c
+            JOIN usuarios u ON c.usuario_id = u.id
+            WHERE c.usuario_id = $1
+        `, [usuarioId]);
         
         if (resultado.rows.length === 0) {
             return res.status(404).json({ error: 'Perfil no encontrado' });
