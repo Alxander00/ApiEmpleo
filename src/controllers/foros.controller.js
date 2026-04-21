@@ -1,18 +1,22 @@
 import { pool } from '../db.js';
 
 // Listar todos los foros
+// En foros.controller.js
 export const listarForos = async (req, res) => {
     try {
+        // Hacemos un JOIN con la tabla usuarios para obtener el nombre o correo
         const result = await pool.query(
-            'SELECT * FROM foros WHERE activo = TRUE ORDER BY creado_el DESC'
+            `SELECT f.*, u.correo_electronico AS autor_nombre 
+             FROM foros f 
+             JOIN usuarios u ON f.usuario_id = u.id 
+             WHERE f.activo = TRUE 
+             ORDER BY f.creado_el DESC`
         );
 
         res.status(200).json(result.rows);
     } catch (error) {
         console.error('Error en listarForos:', error);
-        res.status(500).json({
-            error: 'Error interno del servidor'
-        });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -120,5 +124,26 @@ export const crearRespuestaForo = async (req, res) => {
         res.status(500).json({
             error: 'Error interno del servidor'
         });
+    }
+};
+
+// Eliminar un foro permanentemente
+export const eliminarForo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const result = await pool.query(
+            'DELETE FROM foros WHERE id = $1 RETURNING *',
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Foro no encontrado' });
+        }
+
+        res.status(200).json({ mensaje: 'Foro eliminado correctamente' });
+    } catch (error) {
+        console.error('Error en eliminarForo:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };

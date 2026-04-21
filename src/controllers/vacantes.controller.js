@@ -69,8 +69,11 @@ export const obtenerVacantes = async (req, res) => {
         const vacantes = await pool.query(`
             SELECT 
                 v.*, 
-                e.nombre_comercial AS empresa_nombre, 
-                e.url_logo AS empresa_logo 
+                e.razon_social,
+                e.nombre_comercial,
+                COALESCE(e.nombre_comercial, e.razon_social) AS empresa_nombre, 
+                e.url_logo AS empresa_logo,
+                e.ubicacion_sede
             FROM vacantes v
             JOIN empresas e ON v.empresa_id = e.id
             WHERE v.estado = 'PUBLICADA'
