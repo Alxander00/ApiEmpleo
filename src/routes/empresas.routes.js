@@ -16,3 +16,4 @@ router.post('/mi-empresa', verificarToken, guardarMiEmpresa);
 router.get('/mi-empresa', verificarToken, obtenerMiEmpresa);
 
 export default router;
+
