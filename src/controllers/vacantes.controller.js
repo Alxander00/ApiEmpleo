@@ -1,6 +1,6 @@
 import { pool } from '../db.js';
 
-// 🔹 Crear vacante
+// Crear vacante
 export const crearVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
@@ -63,7 +63,7 @@ export const crearVacante = async (req, res) => {
     }
 };
 
-// 🔹 Listar vacantes públicas
+// Listar vacantes públicas
 export const obtenerVacantes = async (req, res) => {
     try {
         const vacantes = await pool.query(`
@@ -85,7 +85,7 @@ export const obtenerVacantes = async (req, res) => {
     }
 };
 
-// 🔹 Editar vacante
+// Editar vacante
 export const editarVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
@@ -138,7 +138,7 @@ export const editarVacante = async (req, res) => {
     }
 };
 
-// 🔹 Cerrar vacante
+// Cerrar vacante
 export const cerrarVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
@@ -173,7 +173,6 @@ export const cerrarVacante = async (req, res) => {
     }
 };
 
-// PUT /api/vacantes/:id - Actualizar una vacante existente
 export const actualizarVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
@@ -184,14 +183,14 @@ export const actualizarVacante = async (req, res) => {
             ubicacion_especifica, beneficios 
         } = req.body;
 
-        // 1. Validar que el usuario tenga un perfil de empresa
+        // Validar que el usuario tenga un perfil de empresa
         const empresa = await pool.query('SELECT id FROM empresas WHERE usuario_id = $1', [usuarioId]);
         if (empresa.rows.length === 0) {
             return res.status(403).json({ error: 'Perfil de empresa no encontrado' });
         }
         const empresaId = empresa.rows[0].id;
 
-        // 2. Actualizar la vacante en PostgreSQL
+        // Actualizar la vacante en PostgreSQL
         const resultado = await pool.query(
             `UPDATE vacantes 
              SET titulo_puesto = $1, modalidad = $2, descripcion_puesto = $3, 
@@ -217,20 +216,19 @@ export const actualizarVacante = async (req, res) => {
     }
 };
 
-// DELETE /api/vacantes/:id - Eliminar una vacante
 export const eliminarVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
         const { id } = req.params;
 
-        // 1. Validar que el usuario tenga un perfil de empresa
+        // Validar que el usuario tenga un perfil de empresa
         const empresa = await pool.query('SELECT id FROM empresas WHERE usuario_id = $1', [usuarioId]);
         if (empresa.rows.length === 0) {
             return res.status(403).json({ error: 'Perfil de empresa no encontrado' });
         }
         const empresaId = empresa.rows[0].id;
 
-        // 2. Eliminar la vacante (Solo si pertenece a esa empresa)
+        // Eliminar la vacante (Solo si pertenece a esa empresa)
         const resultado = await pool.query(
             'DELETE FROM vacantes WHERE id = $1 AND empresa_id = $2 RETURNING id',
             [id, empresaId]
@@ -243,7 +241,6 @@ export const eliminarVacante = async (req, res) => {
         res.json({ mensaje: 'Vacante eliminada correctamente' });
     } catch (error) {
         console.error('Error en eliminarVacante:', error);
-        // Si hay postulaciones atadas a esta vacante, Postgres bloqueará el DELETE por llave foránea.
         if (error.code === '23503') {
             return res.status(400).json({ error: 'No puedes eliminar una vacante que ya tiene candidatos postulados.' });
         }
@@ -251,7 +248,7 @@ export const eliminarVacante = async (req, res) => {
     }
 };
 
-// 🔹 Obtener solo las vacantes de la empresa autenticada
+// Obtener solo las vacantes de la empresa autenticada
 export const obtenerMisVacantes = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
@@ -287,7 +284,6 @@ export const obtenerMisVacantes = async (req, res) => {
     }
 };
 
-// admin.controller.js o vacantes.controller.js
 export const obtenerDetalleVacanteFull = async (req, res) => {
     try {
         const { id } = req.params;

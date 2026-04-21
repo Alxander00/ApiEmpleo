@@ -6,7 +6,7 @@ import {
 
 const router = Router();
 
-// 🔹 Rutas públicas
+// Rutas públicas
 router.get('/', obtenerCategorias);
 router.get('/:id', obtenerCategoriaPorId);
 

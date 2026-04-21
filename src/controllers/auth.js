@@ -2,13 +2,12 @@ import { pool } from '../db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// auth.js (Controlador de Kevin corregido)
 export const registrarUsuario = async (req, res) => {
-    const client = await pool.connect(); // Usamos cliente para transacciones
+    const client = await pool.connect();
     try {
         const { correo_electronico, password, rol, nombre } = req.body;
 
-        await client.query('BEGIN'); // Iniciamos transacción
+        await client.query('BEGIN');
 
         // 1. Crear el usuario
         const salt = await bcrypt.genSalt(10);
@@ -24,7 +23,7 @@ export const registrarUsuario = async (req, res) => {
         if (rol === 'CANDIDATO') {
             await client.query(
                 'INSERT INTO candidatos (usuario_id, nombres, apellidos) VALUES ($1, $2, $3)',
-                [userId, nombre, ''] // 'nombre' viene del formulario de registro
+                [userId, nombre, '']
             );
         } else if (rol === 'EMPRESA') {
             await client.query(
@@ -33,11 +32,11 @@ export const registrarUsuario = async (req, res) => {
             );
         }
 
-        await client.query('COMMIT'); // Guardamos todo
+        await client.query('COMMIT');
         res.status(201).json({ mensaje: 'Usuario y perfil creados exitosamente' });
 
     } catch (error) {
-        await client.query('ROLLBACK'); // Si algo falla, deshacemos todo
+        await client.query('ROLLBACK');
         console.error('Error en registro:', error.message);
         res.status(500).json({ error: 'Error al registrar usuario' });
     } finally {
@@ -64,7 +63,7 @@ export const loginUsuario = async (req, res) => {
 
         const usuario = resultado.rows[0];
 
-        // 🔥 Validación extra (evita errores raros)
+        // Validación extra
         if (!usuario.password_hash) {
             return res.status(500).json({ error: 'Usuario sin contraseña válida' });
         }
@@ -92,7 +91,6 @@ export const loginUsuario = async (req, res) => {
         });
 
     } catch (error) {
-        // ✅ CORREGIDO AQUÍ
         console.error('Error en loginUsuario:', error.message);
         res.status(500).json({ error: 'Error interno del servidor' });
     }

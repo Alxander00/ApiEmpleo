@@ -13,20 +13,20 @@ import {
 
 import { verificarToken } from '../middlewares/auth.js';
 
-console.log("🔥 ADMIN ROUTES ACTIVAS 🔥");
+console.log(" ADMIN ROUTES ACTIVAS ");
 
 const router = Router();
 
 router.get('/test', (req, res) => {
-    res.json({ mensaje: "Ruta admin funcionando 🔥" });
+    res.json({ mensaje: "Ruta admin funcionando" });
 });
 
-// 🔹 Todas protegidas
+//  Todas protegidas
 router.get('/usuarios', verificarToken, obtenerUsuarios);
 router.patch('/usuarios/:id/suspender', verificarToken, suspenderUsuario);
 router.patch('/empresas/:id/verificar', verificarToken, verificarEmpresa);
 
-// <-- 2. AÑADIR LA RUTA DE MÉTRICAS AQUÍ
+// AÑADIR LA RUTA DE MÉTRICAS AQUÍ
 router.get('/metrics', verificarToken, obtenerMetricasDashboard);
 
 router.get('/vacantes', verificarToken, obtenerTodasVacantes);

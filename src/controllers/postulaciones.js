@@ -1,13 +1,12 @@
 import { pool } from '../db.js';
 
-// POST /api/postulaciones - Un candidato aplica a una vacante
 export const postularVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
         const usuarioRol = req.usuario.rol;
         const { vacanteId } = req.body;
 
-        // 1. Validar rol y datos obligatorios
+        // Validar rol y datos obligatorios
         if (usuarioRol !== 'CANDIDATO') {
             return res.status(403).json({ error: 'Solo los candidatos pueden postularse a vacantes' });
         }
@@ -16,7 +15,7 @@ export const postularVacante = async (req, res) => {
             return res.status(400).json({ error: 'El ID de la vacante es obligatorio' });
         }
 
-        // 2. Verificar que el candidato tenga perfil creado
+        // Verificar que el candidato tenga perfil creado
         const perfilCandidato = await pool.query(
             'SELECT id FROM candidatos WHERE usuario_id = $1',
             [usuarioId]
@@ -28,7 +27,7 @@ export const postularVacante = async (req, res) => {
 
         const candidatoId = perfilCandidato.rows[0].id;
 
-        // 3. Verificar que la vacante exista y esté publicada
+        // Verificar que la vacante exista y esté publicada
         const vacante = await pool.query(
             `SELECT id, estado, fecha_vencimiento 
              FROM vacantes 
@@ -51,7 +50,7 @@ export const postularVacante = async (req, res) => {
             return res.status(400).json({ error: 'La vacante ha expirado' });
         }
 
-        // 4. Intentar insertar (la restricción UNIQUE evitará duplicados)
+        // Intentar insertar
         try {
             const nuevaPostulacion = await pool.query(
                 `INSERT INTO postulaciones (vacante_id, candidato_id, etapa_actual)
@@ -79,19 +78,18 @@ export const postularVacante = async (req, res) => {
     }
 };
 
-// GET /api/postulaciones/vacante/:vacanteId/postulantes - Empresa ve postulantes de su vacante
 export const obtenerPostulantesPorVacante = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
         const usuarioRol = req.usuario.rol;
         const { vacanteId } = req.params;
 
-        // 1. Solo empresas
+        // Solo empresas
         if (usuarioRol !== 'EMPRESA') {
             return res.status(403).json({ error: 'Acceso restringido a empresas' });
         }
 
-        // 2. Verificar que la empresa del usuario existe
+        // Verificar que la empresa del usuario existe
         const empresa = await pool.query(
             'SELECT id FROM empresas WHERE usuario_id = $1',
             [usuarioId]
@@ -103,7 +101,7 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
 
         const empresaId = empresa.rows[0].id;
 
-        // 3. Verificar que la vacante pertenece a esta empresa
+        // Verificar que la vacante pertenece a esta empresa
         const vacante = await pool.query(
             `SELECT id, titulo_puesto 
              FROM vacantes 
@@ -115,7 +113,7 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
             return res.status(404).json({ error: 'Vacante no encontrada o no pertenece a tu empresa' });
         }
 
-        // 4. Obtener lista de postulantes con información básica del candidato
+        // Obtener lista de postulantes con información básica del candidato
         const postulantes = await pool.query(
             `SELECT 
                 p.id AS postulacion_id,
@@ -150,24 +148,23 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
     }
 };
 
-// PATCH /api/postulaciones/:id - Actualizar la etapa de la postulación
 export const actualizarEstadoPostulacion = async (req, res) => {
     try {
         const usuarioRol = req.usuario.rol;
         const { id } = req.params; // Este es el ID de la postulación
         const { etapa_actual } = req.body;
 
-        // 1. Validar permisos
+        // Validar permisos
         if (usuarioRol !== 'EMPRESA') {
             return res.status(403).json({ error: 'Solo empresas pueden cambiar estados' });
         }
 
-        // 2. Validar que envíen el estado
+        // Validar que envíen el estado
         if (!etapa_actual) {
             return res.status(400).json({ error: 'La etapa_actual es obligatoria' });
         }
 
-        // 3. Actualizar en PostgreSQL
+        // Actualizar en PostgreSQL
         const resultado = await pool.query(
             `UPDATE postulaciones 
              SET etapa_actual = $1 
@@ -191,7 +188,6 @@ export const actualizarEstadoPostulacion = async (req, res) => {
     }
 };
 
-// GET /api/postulaciones/mis-postulaciones - Candidato ve su historial
 export const obtenerMisPostulaciones = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;

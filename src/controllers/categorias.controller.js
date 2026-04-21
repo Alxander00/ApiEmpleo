@@ -1,6 +1,6 @@
 import { pool } from '../db.js';
 
-// 🔹 Obtener todas las categorías
+// Obtener todas las categorías
 export const obtenerCategorias = async (req, res) => {
     try {
         const categorias = await pool.query(
@@ -15,7 +15,7 @@ export const obtenerCategorias = async (req, res) => {
     }
 };
 
-// 🔹 Obtener una categoría por ID (opcional pero pro)
+// Obtener una categoría por ID
 export const obtenerCategoriaPorId = async (req, res) => {
     try {
         const { id } = req.params;

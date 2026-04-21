@@ -1,5 +1,4 @@
 import { Router } from 'express';
-// Agregamos la función de actualizar al import
 import { postularVacante, obtenerPostulantesPorVacante, actualizarEstadoPostulacion, obtenerMisPostulaciones } from '../controllers/postulaciones.js';
 import { verificarToken } from '../middlewares/auth.js';
 

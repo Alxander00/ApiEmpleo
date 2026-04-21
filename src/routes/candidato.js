@@ -7,8 +7,8 @@ const router = Router();
 router.use(verificarToken);
 
 // Rutas
-router.post('/mi-perfil', crearPerfilCandidato); // POST para crear o actualizar
+router.post('/mi-perfil', crearPerfilCandidato);
 router.get('/mi-perfil', obtenerMiPerfil);   
-router.post('/:id/vista', registrarVistaPerfil);    // GET para ver sus datos
+router.post('/:id/vista', registrarVistaPerfil);
 
 export default router;

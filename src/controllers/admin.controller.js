@@ -1,6 +1,6 @@
 import { pool } from '../db.js';
 
-// 🔹 Ver todos los usuarios
+// Ver todos los usuarios
 export const obtenerUsuarios = async (req, res) => {
     try {
         if (req.usuario.rol !== 'ADMINISTRADOR') {
@@ -19,7 +19,7 @@ export const obtenerUsuarios = async (req, res) => {
     }
 };
 
-// 🔹 Suspender usuario
+// Suspender usuario
 export const suspenderUsuario = async (req, res) => {
     try {
         if (req.usuario.rol !== 'ADMINISTRADOR') {
@@ -41,7 +41,7 @@ export const suspenderUsuario = async (req, res) => {
     }
 };
 
-// 🔹 Verificar empresa
+// Verificar empresa
 export const verificarEmpresa = async (req, res) => {
     try {
         if (req.usuario.rol !== 'ADMINISTRADOR') {
@@ -87,14 +87,9 @@ export const obtenerMetricasDashboard = async (req, res) => {
     }
 };
 
-// admin.controller.js - Funciones adicionales
-
-// admin.controller.js - Funciones adicionales corregidas
-
-// 🔹 Gestionar Vacantes (CORREGIDO)
+// Gestionar Vacantes (CORREGIDO)
 export const obtenerTodasVacantes = async (req, res) => {
     try {
-        // CORRECCIÓN: Usamos razon_social o nombre_comercial porque nombre_empresa no existe en la DB
         const result = await pool.query(`
             SELECT v.id, v.titulo_puesto, v.estado, v.modalidad, 
                    COALESCE(e.nombre_comercial, e.razon_social, 'Empresa Desconocida') as nombre_empresa
@@ -119,10 +114,9 @@ export const eliminarVacante = async (req, res) => {
     }
 };
 
-// 🔹 Gestionar Foro (CORREGIDO)
+// Gestionar Foro
 export const obtenerPostsForo = async (req, res) => {
     try {
-        // CORRECCIÓN: La tabla se llama "foros" (en plural), no "foro"
         const result = await pool.query(`
             SELECT f.*, u.correo_electronico 
             FROM foros f 
@@ -136,7 +130,7 @@ export const obtenerPostsForo = async (req, res) => {
     }
 };
 
-// 🔹 Activar usuario (NUEVA FUNCIÓN FALTANTE)
+// Activar usuario
 export const activarUsuario = async (req, res) => {
     try {
         if (req.usuario.rol !== 'ADMINISTRADOR') {

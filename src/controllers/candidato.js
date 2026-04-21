@@ -13,7 +13,6 @@ export const crearPerfilCandidato = async (req, res) => {
             return res.status(400).json({ error: 'Nombres y apellidos son obligatorios' });
         }
 
-        // Convertimos el string de habilidades en un array para PostgreSQL
         const habilidadesArr = Array.isArray(habilidades_tecnicas) 
             ? habilidades_tecnicas 
             : (habilidades_tecnicas ? habilidades_tecnicas.split(',').map(s => s.trim()) : []);
@@ -22,7 +21,7 @@ export const crearPerfilCandidato = async (req, res) => {
 
         let resultado;
         if (perfilExistente.rows.length > 0) {
-            // Lógica de ACTUALIZACIÓN
+            // ACTUALIZACIÓN
             resultado = await pool.query(
                 `UPDATE candidatos 
                  SET nombres = $1, apellidos = $2, telefono_contacto = $3, fecha_nacimiento = $4, 
@@ -32,7 +31,7 @@ export const crearPerfilCandidato = async (req, res) => {
                 [nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidadesArr, usuarioId]
             );
         } else {
-            // Lógica de CREACIÓN
+            // CREACIÓN
             resultado = await pool.query(
                 `INSERT INTO candidatos (usuario_id, nombres, apellidos, telefono_contacto, fecha_nacimiento, titular_profesional, resumen_biografico, url_curriculum_pdf, foto_perfil_url, habilidades_tecnicas) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
@@ -61,14 +60,11 @@ export const obtenerMiPerfil = async (req, res) => {
     }
 };
 
-// Añadir esta función en controllers/candidato.js
-
 export const registrarVistaPerfil = async (req, res) => {
     try {
-        const { id } = req.params; // Este es el ID del candidato que están viendo
-        const rol = req.usuario.rol; // Lo sacamos del token
+        const { id } = req.params;
+        const rol = req.usuario.rol;
 
-        // Seguridad: Solo las EMPRESAS suman vistas reales
         if (rol !== 'EMPRESA') {
             return res.status(403).json({ error: 'Solo las empresas pueden generar vistas al perfil' });
         }
