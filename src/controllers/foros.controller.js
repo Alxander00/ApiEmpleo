@@ -3,7 +3,9 @@ import { pool } from '../db.js';
 // Listar todos los foros
 export const listarForos = async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM foros ORDER BY creado_el DESC');
+        const result = await pool.query(
+            'SELECT * FROM foros WHERE activo = TRUE ORDER BY creado_el DESC'
+        );
 
         res.status(200).json(result.rows);
     } catch (error) {
@@ -20,7 +22,7 @@ export const obtenerForoPorId = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(
-            'SELECT * FROM foros WHERE id = $1',
+            'SELECT * FROM foros WHERE id = $1 AND activo = TRUE',
             [id]
         );
 
@@ -39,7 +41,7 @@ export const obtenerForoPorId = async (req, res) => {
     }
 };
 
-// Crear un nuevo foro
+// Crear un foro
 export const crearForo = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;

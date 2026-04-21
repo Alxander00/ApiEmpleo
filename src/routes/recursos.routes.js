@@ -6,7 +6,6 @@ import {
 
 const router = Router();
 
-// Públicas
 router.get('/', listarRecursos);
 router.get('/:id', obtenerRecursoPorId);
 

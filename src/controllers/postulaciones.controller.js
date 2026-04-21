@@ -24,7 +24,7 @@ export const postularVacante = async (req, res) => {
         if (perfilCandidato.rows.length === 0) {
             return res.status(400).json({ error: 'Debes completar tu perfil de candidato antes de postularte' });
         }
-
+        
         const candidatoId = perfilCandidato.rows[0].id;
 
         // Verificar que la vacante exista y esté publicada
