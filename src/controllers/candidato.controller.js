@@ -60,6 +60,28 @@ export const obtenerMiPerfil = async (req, res) => {
     }
 };
 
+export const obtenerCandidatoPorId = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const resultado = await pool.query(
+            `SELECT c.*, u.correo_electronico 
+             FROM candidatos c
+             JOIN usuarios u ON c.usuario_id = u.id
+             WHERE c.id = $1`,
+            [id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: 'Candidato no encontrado' });
+        }
+
+        res.json(resultado.rows[0]);
+    } catch (error) {
+        console.error('Error en obtenerCandidatoPorId:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
 export const registrarVistaPerfil = async (req, res) => {
     try {
         const { id } = req.params;
@@ -88,28 +110,6 @@ export const registrarVistaPerfil = async (req, res) => {
 
     } catch (error) {
         console.error('Error en registrarVistaPerfil:', error.message);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-};
-export const obtenerCandidatoPorId = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const resultado = await pool.query(
-            `SELECT c.*, u.correo_electronico 
-             FROM candidatos c
-             JOIN usuarios u ON c.usuario_id = u.id
-             WHERE c.id = $1`,
-            [id]
-        );
-
-        if (resultado.rows.length === 0) {
-            return res.status(404).json({ error: 'Candidato no encontrado' });
-        }
-
-        // Opcional: podrías omitir campos sensibles si lo deseas
-        res.json(resultado.rows[0]);
-    } catch (error) {
-        console.error('Error en obtenerCandidatoPorId:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
