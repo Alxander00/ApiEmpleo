@@ -42,7 +42,8 @@ export const postularVacante = async (req, res) => {
         const estadoVacante = vacante.rows[0].estado;
         const fechaVenc = vacante.rows[0].fecha_vencimiento;
 
-        if (estadoVacante !== 'PUBLICADA') {
+        // Ahora validamos que no esté INACTIVA (antes decía solo PUBLICADA)
+        if (estadoVacante === 'INACTIVA' || estadoVacante === 'FINALIZADA') {
             return res.status(400).json({ error: 'Esta vacante no está disponible para postulaciones' });
         }
 
@@ -65,7 +66,6 @@ export const postularVacante = async (req, res) => {
             });
 
         } catch (error) {
-            // Violación de UNIQUE (ya postulado)
             if (error.code === '23505') {
                 return res.status(409).json({ error: 'Ya te has postulado a esta vacante anteriormente' });
             }
@@ -84,12 +84,10 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
         const usuarioRol = req.usuario.rol;
         const { vacanteId } = req.params;
 
-        // Solo empresas
         if (usuarioRol !== 'EMPRESA') {
             return res.status(403).json({ error: 'Acceso restringido a empresas' });
         }
 
-        // Verificar que la empresa del usuario existe
         const empresa = await pool.query(
             'SELECT id FROM empresas WHERE usuario_id = $1',
             [usuarioId]
@@ -101,7 +99,6 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
 
         const empresaId = empresa.rows[0].id;
 
-        // Verificar que la vacante pertenece a esta empresa
         const vacante = await pool.query(
             `SELECT id, titulo_puesto 
              FROM vacantes 
@@ -113,7 +110,6 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
             return res.status(404).json({ error: 'Vacante no encontrada o no pertenece a tu empresa' });
         }
 
-        // Obtener lista de postulantes con información básica del candidato
         const postulantes = await pool.query(
             `SELECT 
                 p.id AS postulacion_id,
@@ -151,20 +147,28 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
 export const actualizarEstadoPostulacion = async (req, res) => {
     try {
         const usuarioRol = req.usuario.rol;
-        const { id } = req.params; // Este es el ID de la postulación
+        const usuarioId = req.usuario.id;
+        const { id } = req.params; 
         const { etapa_actual } = req.body;
 
-        // Validar permisos
         if (usuarioRol !== 'EMPRESA') {
             return res.status(403).json({ error: 'Solo empresas pueden cambiar estados' });
         }
 
-        // Validar que envíen el estado
         if (!etapa_actual) {
             return res.status(400).json({ error: 'La etapa_actual es obligatoria' });
         }
 
-        // Actualizar en PostgreSQL
+        // --- CANDADO 2: VALIDAR QUE LA EMPRESA NO ESTÉ SUSPENDIDA (Previene sesiones fantasma) ---
+        const estadoEmpresa = await pool.query(
+            'SELECT estado FROM usuarios WHERE id = $1',
+            [usuarioId]
+        );
+
+        if (estadoEmpresa.rows.length === 0 || estadoEmpresa.rows[0].estado === 'SUSPENDIDO') {
+            return res.status(403).json({ error: 'Tu cuenta ha sido suspendida. No puedes gestionar postulantes.' });
+        }
+
         const resultado = await pool.query(
             `UPDATE postulaciones 
              SET etapa_actual = $1 
@@ -193,20 +197,23 @@ export const obtenerMisPostulaciones = async (req, res) => {
         const usuarioId = req.usuario.id;
         if (req.usuario.rol !== 'CANDIDATO') return res.status(403).json({ error: 'Solo candidatos' });
 
-        // Buscamos el ID del candidato
         const candidato = await pool.query('SELECT id FROM candidatos WHERE usuario_id = $1', [usuarioId]);
         if (candidato.rows.length === 0) return res.status(404).json({ error: 'Perfil no encontrado' });
 
         const candidatoId = candidato.rows[0].id;
 
-        // Traemos las postulaciones con el nombre de la vacante y la empresa
+        // --- CANDADO 3: MOSTRAR EMPRESA COMO SUSPENDIDA AL CANDIDATO ---
         const postulaciones = await pool.query(
             `SELECT p.id, p.etapa_actual, p.fecha_postulacion, 
                     v.titulo_puesto, v.modalidad, v.ubicacion_especifica,
-                    e.nombre_comercial AS empresa
+                    CASE 
+                        WHEN u_empresa.estado = 'SUSPENDIDO' THEN 'Empresa (Suspendida)'
+                        ELSE COALESCE(e.nombre_comercial, e.razon_social)
+                    END AS empresa
              FROM postulaciones p
              INNER JOIN vacantes v ON p.vacante_id = v.id
              INNER JOIN empresas e ON v.empresa_id = e.id
+             INNER JOIN usuarios u_empresa ON e.usuario_id = u_empresa.id
              WHERE p.candidato_id = $1
              ORDER BY p.fecha_postulacion DESC`,
             [candidatoId]

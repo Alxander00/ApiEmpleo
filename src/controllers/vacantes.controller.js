@@ -34,11 +34,12 @@ export const crearVacante = async (req, res) => {
             fecha_vencimiento
         } = req.body;
 
+        // AQUÍ EL CAMBIO: Agregamos 'estado' y su valor 'ACTIVA'
         const nuevaVacante = await pool.query(
             `INSERT INTO vacantes 
             (empresa_id, titulo_puesto, descripcion_puesto, requisitos, beneficios, 
-            rango_salarial_min, rango_salarial_max, ubicacion_especifica, modalidad, categoria_id, fecha_vencimiento)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            rango_salarial_min, rango_salarial_max, ubicacion_especifica, modalidad, categoria_id, fecha_vencimiento, estado)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, 'ACTIVA')
             RETURNING *`,
             [
                 empresaId,
@@ -76,7 +77,9 @@ export const obtenerVacantes = async (req, res) => {
                 e.ubicacion_sede
             FROM vacantes v
             JOIN empresas e ON v.empresa_id = e.id
-            WHERE v.estado = 'PUBLICADA'
+            JOIN usuarios u ON e.usuario_id = u.id 
+            WHERE (v.estado != 'INACTIVA' OR v.estado IS NULL)
+              AND u.estado != 'SUSPENDIDO' -- El candado que oculta ofertas de empresas suspendidas
             ORDER BY v.creado_el DESC
         `);
 
@@ -301,5 +304,49 @@ export const obtenerDetalleVacanteFull = async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error de servidor' });
+    }
+};
+
+// Cambiar el estado de la vacante (Activa / Inactiva) con validación de Suspensión
+export const cambiarEstadoVacante = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        const { id } = req.params;
+        const { estado } = req.body; 
+
+        // Validar que el usuario tenga un perfil de empresa Y QUE NO ESTÉ SUSPENDIDO
+        const empresa = await pool.query(`
+            SELECT e.id, u.estado AS estado_usuario
+            FROM empresas e
+            JOIN usuarios u ON e.usuario_id = u.id
+            WHERE e.usuario_id = $1
+        `, [usuarioId]);
+
+        if (empresa.rows.length === 0) {
+            return res.status(403).json({ error: 'Perfil de empresa no encontrado' });
+        }
+
+        // EL CANDADO DE SEGURIDAD
+        if (empresa.rows[0].estado_usuario === 'SUSPENDIDO') {
+            return res.status(403).json({ error: 'Tu cuenta ha sido suspendida. No puedes modificar vacantes.' });
+        }
+
+        const empresaId = empresa.rows[0].id;
+
+        // Actualizar el estado
+        const resultado = await pool.query(
+            'UPDATE vacantes SET estado = $1 WHERE id = $2 AND empresa_id = $3 RETURNING *',
+            [estado, id, empresaId]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: 'Vacante no encontrada o no tienes permisos' });
+        }
+
+        res.json({ mensaje: 'Estado de la vacante actualizado', vacante: resultado.rows[0] });
+
+    } catch (error) {
+        console.error('Error en cambiarEstadoVacante:', error.message);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };

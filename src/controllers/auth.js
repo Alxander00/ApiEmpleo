@@ -63,6 +63,11 @@ export const loginUsuario = async (req, res) => {
 
         const usuario = resultado.rows[0];
 
+        // --- CANDADO 1: BLOQUEAR SUSPENDIDOS ---
+        if (usuario.estado === 'SUSPENDIDO') {
+            return res.status(403).json({ error: 'Tu cuenta ha sido suspendida por la administración. Contacta a soporte.' });
+        }
+
         // Validación extra
         if (!usuario.password_hash) {
             return res.status(500).json({ error: 'Usuario sin contraseña válida' });
