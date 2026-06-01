@@ -1,10 +1,10 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: './.env' });
+import 'dotenv/config'; 
 
 import express from 'express';
 import cors from 'cors';
 import { pool } from './db.js';
 
+// Importación de Rutas
 import authRoutes from './routes/auth.routes.js';
 import candidatosRoutes from './routes/candidato.routes.js';
 import empresasRoutes from './routes/empresas.routes.js';
@@ -15,8 +15,13 @@ import recursosRoutes from './routes/recursos.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
+
+// Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Verificación de carga de variables (Solo para depurar, puedes borrarlo luego)
+console.log("Estado de JWT_SECRET:", process.env.JWT_SECRET ? "Cargada ✅" : "No encontrada ❌");
 
 // Rutas
 app.use('/api', authRoutes);
@@ -33,6 +38,26 @@ app.get('/', (req, res) => {
     res.send('Servidor funcionando.');
 });
 
-app.listen(process.env.PORT || 3000, () => {
-    console.log(`Servidor corriendo en http://localhost:${process.env.PORT || 3000}`);
+import { Resend } from 'resend';
+app.get('/test-email', async (req, res) => {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: 'alextejada025@gmail.com',
+      subject: 'Prueba EmpleoYa',
+      html: '<strong>Funciona!</strong>'
+    });
+    if (error) throw error;
+    res.send('Correo enviado');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send(err.message);
+  }
+});
+
+// Inicio del servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

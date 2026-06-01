@@ -1,4 +1,8 @@
 import { pool } from '../db.js';
+import { Resend } from 'resend';
+
+console.log("¿Tengo API Key cargada?:", process.env.RESEND_API_KEY ? "SÍ ✅" : "NO ❌");
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const postularVacante = async (req, res) => {
     try {
@@ -6,7 +10,6 @@ export const postularVacante = async (req, res) => {
         const usuarioRol = req.usuario.rol;
         const { vacanteId } = req.body;
 
-        // Validar rol y datos obligatorios
         if (usuarioRol !== 'CANDIDATO') {
             return res.status(403).json({ error: 'Solo los candidatos pueden postularse a vacantes' });
         }
@@ -15,7 +18,6 @@ export const postularVacante = async (req, res) => {
             return res.status(400).json({ error: 'El ID de la vacante es obligatorio' });
         }
 
-        // Verificar que el candidato tenga perfil creado
         const perfilCandidato = await pool.query(
             'SELECT id FROM candidatos WHERE usuario_id = $1',
             [usuarioId]
@@ -27,7 +29,6 @@ export const postularVacante = async (req, res) => {
         
         const candidatoId = perfilCandidato.rows[0].id;
 
-        // Verificar que la vacante exista y esté publicada
         const vacante = await pool.query(
             `SELECT id, estado, fecha_vencimiento 
              FROM vacantes 
@@ -42,7 +43,6 @@ export const postularVacante = async (req, res) => {
         const estadoVacante = vacante.rows[0].estado;
         const fechaVenc = vacante.rows[0].fecha_vencimiento;
 
-        // Ahora validamos que no esté INACTIVA (antes decía solo PUBLICADA)
         if (estadoVacante === 'INACTIVA' || estadoVacante === 'FINALIZADA') {
             return res.status(400).json({ error: 'Esta vacante no está disponible para postulaciones' });
         }
@@ -51,7 +51,6 @@ export const postularVacante = async (req, res) => {
             return res.status(400).json({ error: 'La vacante ha expirado' });
         }
 
-        // Intentar insertar
         try {
             const nuevaPostulacion = await pool.query(
                 `INSERT INTO postulaciones (vacante_id, candidato_id, etapa_actual)
@@ -100,7 +99,7 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
         const empresaId = empresa.rows[0].id;
 
         const vacante = await pool.query(
-            `SELECT id, titulo_puesto 
+            `SELECT id, titulo_puesto, estado 
              FROM vacantes 
              WHERE id = $1 AND empresa_id = $2`,
             [vacanteId, empresaId]
@@ -108,6 +107,16 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
 
         if (vacante.rows.length === 0) {
             return res.status(404).json({ error: 'Vacante no encontrada o no pertenece a tu empresa' });
+        }
+
+        const vacanteData = vacante.rows[0];
+
+        // Validación: No mostrar postulantes si la vacante está INACTIVA o FINALIZADA
+        if (vacanteData.estado === 'INACTIVA') {
+            return res.status(403).json({ error: 'Esta vacante está inactiva. No puedes ver los postulantes.' });
+        }
+        if (vacanteData.estado === 'FINALIZADA') {
+            return res.status(403).json({ error: 'Esta vacante ya está cerrada. No puedes ver los postulantes.' });
         }
 
         const postulantes = await pool.query(
@@ -131,8 +140,9 @@ export const obtenerPostulantesPorVacante = async (req, res) => {
 
         res.json({
             vacante: {
-                id: vacante.rows[0].id,
-                titulo: vacante.rows[0].titulo_puesto
+                id: vacanteData.id,
+                titulo: vacanteData.titulo_puesto,
+                estado: vacanteData.estado
             },
             total_postulantes: postulantes.rows.length,
             postulantes: postulantes.rows
@@ -159,7 +169,6 @@ export const actualizarEstadoPostulacion = async (req, res) => {
             return res.status(400).json({ error: 'La etapa_actual es obligatoria' });
         }
 
-        // --- CANDADO 2: VALIDAR QUE LA EMPRESA NO ESTÉ SUSPENDIDA (Previene sesiones fantasma) ---
         const estadoEmpresa = await pool.query(
             'SELECT estado FROM usuarios WHERE id = $1',
             [usuarioId]
@@ -169,6 +178,29 @@ export const actualizarEstadoPostulacion = async (req, res) => {
             return res.status(403).json({ error: 'Tu cuenta ha sido suspendida. No puedes gestionar postulantes.' });
         }
 
+        // 🔍 Verificar el estado de la vacante asociada a esta postulación
+        const infoVacante = await pool.query(`
+            SELECT v.estado AS estado_vacante
+            FROM postulaciones p
+            JOIN vacantes v ON p.vacante_id = v.id
+            WHERE p.id = $1
+        `, [id]);
+
+        if (infoVacante.rows.length === 0) {
+            return res.status(404).json({ error: 'Postulación no encontrada' });
+        }
+
+        const estadoVacante = infoVacante.rows[0].estado_vacante;
+
+        // ❌ No permitir cambios si la vacante está inactiva o finalizada
+        if (estadoVacante === 'INACTIVA') {
+            return res.status(403).json({ error: 'No puedes cambiar el estado de postulantes porque la vacante está inactiva.' });
+        }
+        if (estadoVacante === 'FINALIZADA') {
+            return res.status(403).json({ error: 'No puedes cambiar el estado de postulantes porque la vacante ya está cerrada.' });
+        }
+
+        // Actualizar estado de la postulación
         const resultado = await pool.query(
             `UPDATE postulaciones 
              SET etapa_actual = $1 
@@ -179,6 +211,76 @@ export const actualizarEstadoPostulacion = async (req, res) => {
 
         if (resultado.rows.length === 0) {
             return res.status(404).json({ error: 'Postulación no encontrada' });
+        }
+
+        // --- Envío de correo de notificación ---
+        const infoCorreo = await pool.query(`
+            SELECT 
+                c.nombres AS candidato_nombre,
+                u.correo_electronico AS candidato_email,
+                v.titulo_puesto,
+                e.nombre_comercial AS empresa_nombre
+            FROM postulaciones p
+            JOIN candidatos c ON p.candidato_id = c.id
+            JOIN usuarios u ON c.usuario_id = u.id
+            JOIN vacantes v ON p.vacante_id = v.id
+            JOIN empresas e ON v.empresa_id = e.id
+            WHERE p.id = $1
+        `, [id]);
+
+        if (infoCorreo.rows.length > 0) {
+            const info = infoCorreo.rows[0];
+            let asunto = '';
+            let mensajeHtml = '';
+
+            if (etapa_actual === 'ENTREVISTA') {
+                asunto = `¡Buenas noticias de ${info.empresa_nombre}!`;
+                mensajeHtml = `
+                    <div style="font-family: Arial, sans-serif; color: #333;">
+                        <h2 style="color: #0d6efd;">Hola ${info.candidato_nombre},</h2>
+                        <p>Nos complace informarte que tu postulación para <strong>${info.titulo_puesto}</strong> ha avanzado a la fase de <strong>Entrevista</strong>.</p>
+                        <p>El equipo de ${info.empresa_nombre} se pondrá en contacto contigo muy pronto para agendar los detalles.</p>
+                        <br>
+                        <p>Atentamente,<br><strong>El equipo de EmpleoYa</strong></p>
+                    </div>
+                `;
+            } else if (etapa_actual === 'RECHAZADO') {
+                asunto = `Actualización de tu postulación en ${info.empresa_nombre}`;
+                mensajeHtml = `
+                    <div style="font-family: Arial, sans-serif; color: #333;">
+                        <h2>Hola ${info.candidato_nombre},</h2>
+                        <p>Gracias por tu interés en la vacante de <strong>${info.titulo_puesto}</strong>.</p>
+                        <p>En esta ocasión, la empresa ${info.empresa_nombre} ha decidido avanzar con otros perfiles que se alinean más a lo que buscan actualmente. ¡No te desanimes! Te invitamos a seguir aplicando a otras ofertas en nuestro portal.</p>
+                        <br>
+                        <p>Atentamente,<br><strong>El equipo de EmpleoYa</strong></p>
+                    </div>
+                `;
+            } else if (etapa_actual === 'CONTRATADO') {
+                asunto = `¡Felicidades! Has sido seleccionado por ${info.empresa_nombre}`;
+                mensajeHtml = `
+                    <div style="font-family: Arial, sans-serif; color: #333;">
+                        <h2 style="color: #198754;">¡Felicidades ${info.candidato_nombre}! 🎉</h2>
+                        <p>Tu proceso para <strong>${info.titulo_puesto}</strong> ha sido un éxito y has sido seleccionado para el puesto.</p>
+                        <p>Prepárate para esta nueva aventura profesional.</p>
+                        <br>
+                        <p>Atentamente,<br><strong>El equipo de EmpleoYa</strong></p>
+                    </div>
+                `;
+            }
+
+            if (asunto !== '') {
+                try {
+                    await resend.emails.send({
+                        from: 'EmpleoYa Notificaciones <onboarding@resend.dev>',
+                        to: info.candidato_email,
+                        subject: asunto,
+                        html: mensajeHtml
+                    });
+                    console.log(`✉️ Correo enviado a ${info.candidato_email} - Estado: ${etapa_actual}`);
+                } catch (emailError) {
+                    console.error('Error al enviar el correo:', emailError);
+                }
+            }
         }
 
         res.json({ 
@@ -202,7 +304,6 @@ export const obtenerMisPostulaciones = async (req, res) => {
 
         const candidatoId = candidato.rows[0].id;
 
-        // --- CANDADO 3: MOSTRAR EMPRESA COMO SUSPENDIDA AL CANDIDATO ---
         const postulaciones = await pool.query(
             `SELECT p.id, p.etapa_actual, p.fecha_postulacion, 
                     v.titulo_puesto, v.modalidad, v.ubicacion_especifica,
